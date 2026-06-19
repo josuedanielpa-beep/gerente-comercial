@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auditoría comercial</title>
+<style>
+  :root {
+    --bg: #1b1d1f;
+    --panel: #232629;
+    --panel-2: #2a2e31;
+    --ink: #e9e6e0;
+    --ink-soft: #9aa0a3;
+    --ink-faint: #6f7578;
+    --line: #353a3d;
+    --accent: #7fc4b3;
+    --accent-dim: #4d7d71;
+    --won: #79c08a;
+    --lost: #d97a63;
+    --radius: 10px;
+    --mono: "SF Mono", "Consolas", "Menlo", monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.45;
+    padding: 32px 24px 80px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header { margin-bottom: 26px; }
+  .eyebrow {
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600; margin-bottom: 6px;
+  }
+  h1 { font-size: 24px; margin: 0 0 6px; letter-spacing: -0.01em; color: var(--ink); }
+  .sub { color: var(--ink-soft); font-size: 13.5px; max-width: 640px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-bottom: 18px;
+  }
+  .panel h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-soft); margin: 0 0 4px; font-weight: 600;
+  }
+  .help {
+    color: var(--ink-faint); font-size: 12px; margin: 0 0 16px; max-width: 680px;
+  }
+  label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
+  input[type="text"], input[type="date"] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+    font-family: var(--sans); font-size: 14px; background: var(--panel-2); color: var(--ink);
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); }
+
+  .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: end; }
+  .row > div { flex: 1; min-width: 170px; }
+  .row.tight > div { flex: 0 0 auto; min-width: 0; }
+
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .presets button {
+    background: var(--panel-2); color: var(--ink-soft); border: 1px solid var(--line);
+    font-weight: 500; padding: 5px 10px; font-size: 12px;
+  }
+  .presets button:hover { color: var(--ink); border-color: var(--accent-dim); }
+
+  .toggle-group { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; width: fit-content; }
+  .toggle-group label {
+    margin: 0; padding: 7px 12px; font-size: 13px; cursor: pointer; color: var(--ink-soft);
+    background: var(--panel-2); border-right: 1px solid var(--line);
+  }
+  .toggle-group label:last-child { border-right: none; }
+  .toggle-group input { display: none; }
+  .toggle-group input:checked + span { color: var(--bg); }
+  .toggle-group label.active { background: var(--accent); color: var(--bg); font-weight: 600; }
+
+  button {
+    background: var(--accent); color: #16201d; border: none; padding: 10px 20px;
+    border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+  }
+  button:hover { opacity: 0.88; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent-dim); }
+
+  .checks { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 4px; }
+  .checks label {
+    display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 13px; margin: 0; cursor: pointer;
+  }
+  .checkbox-line { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
+
+  .status { font-size: 13px; margin-top: 12px; white-space: pre-wrap; font-family: var(--mono); }
+  .status.ok { color: var(--won); }
+  .status.err { color: var(--lost); }
+  .status.pending { color: var(--ink-soft); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .table-scroll { overflow-x: auto; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--ink-faint); font-weight: 600; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.04em; white-space: nowrap; }
+  td.num, th.num { font-family: var(--mono); }
+  tr.totales td { font-weight: 700; border-top: 2px solid var(--ink-soft); border-bottom: none; }
+  .numval { display: block; }
+  .pct { display: block; color: var(--accent); font-size: 10.5px; margin-top: 1px; font-family: var(--mono); }
+  .motivos { font-size: 11px; color: #e0b18f; max-width: 170px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help; }
+
+  details { margin-top: 14px; }
+  summary { cursor: pointer; font-size: 12.5px; color: var(--ink-faint); }
+  pre {
+    background: #15171a; padding: 14px; border-radius: 6px; font-family: var(--mono);
+    font-size: 11px; overflow-x: auto; max-height: 320px; color: var(--ink-soft);
+  }
+  .empty { color: var(--ink-soft); font-size: 13px; padding: 20px 0; text-align: center; }
+  .resultsRow { display: flex; gap: 18px; flex-wrap: wrap; }
+  .resultsRow > .panel { flex: 1; min-width: 380px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Digital Crew · Auditoría comercial</div>
+    <h1>Reporte de desempeño y pipeline</h1>
+    <div class="sub">Lee directo de Kommo: desempeño del periodo elegido y un corte de quién está calificado ahora mismo, por embudo.</div>
+  </header>
+
+  <div class="panel">
+    <h2>Filtros</h2>
+    <p class="help">El rango de fechas filtra el reporte de desempeño. El cross-tab de calificados es un corte del momento actual — solo usa fecha de creación si decides acotarlo, no fecha de cierre (un lead calificado, por definición, no está cerrado).</p>
+
+    <div class="row">
+      <div>
+        <label for="dateFrom">Desde</label>
+        <input type="date" id="dateFrom">
+      </div>
+      <div>
+        <label for="dateTo">Hasta</label>
+        <input type="date" id="dateTo">
+      </div>
+      <div>
+        <label>Filtrar desempeño por</label>
+        <div class="toggle-group" id="filterByToggle">
+          <label class="active" data-value="created_at"><span>Fecha de creación</span></label>
+          <label data-value="closed_at"><span>Fecha de cierre</span></label>
+        </div>
+      </div>
+    </div>
+    <div class="presets">
+      <button type="button" data-preset="hoy">Hoy</button>
+      <button type="button" data-preset="semana">Esta semana</button>
+      <button type="button" data-preset="mes">Este mes</button>
+      <button type="button" data-preset="mesPasado">Mes pasado</button>
+    </div>
+    <p class="help" style="margin-top:8px;">
+      <b>Fecha de creación:</b> leads que nacieron en ese rango, sin importar dónde terminaron.
+      <b>Fecha de cierre:</b> leads que se ganaron o perdieron en ese rango, sin importar cuándo nacieron.
+    </p>
+
+    <div style="margin-top:14px;">
+      <label>Embudos (vacío = todos)</label>
+      <div class="checks" id="pipelineChecks"><span class="help">Cargando catálogo…</span></div>
+    </div>
+    <div style="margin-top:14px;">
+      <label>Agentes (vacío = todos)</label>
+      <div class="checks" id="agentChecks"></div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <label>Calificados por embudo: ¿cuáles incluyo?</label>
+      <div class="toggle-group" id="calificadosToggle">
+        <label class="active" data-value="actual"><span>Todos los que hay ahora</span></label>
+        <label data-value="periodo"><span>Solo los creados en ese periodo</span></label>
+      </div>
+      <p class="help" style="margin-top:6px;">"Todos los que hay ahora" ignora las fechas de arriba — es la foto completa del pipeline hoy. "Solo los creados en ese periodo" lo limita a leads que nacieron en el rango de fechas que pusiste arriba.</p>
+    </div>
+
+    <div style="margin-top:16px;">
+      <button id="btnGenerar">Generar reporte completo</button>
+    </div>
+
+    <div class="status pending" id="status">Cargando catálogo de embudos y agentes…</div>
+  </div>
+
+  <div class="resultsRow" id="resultsRow" style="display:none;">
+    <div class="panel">
+      <h2>Desempeño del periodo</h2>
+      <p class="help">Cuántos leads entraron, a cuántos se les habló de verdad, cuántos llegaron a cotización/calificado, y cómo se perdieron los que se perdieron.</p>
+      <div id="resultsTable"></div>
+      <details><summary>JSON crudo</summary><pre id="rawJson"></pre></details>
+    </div>
+    <div class="panel">
+      <h2>Calificados por embudo</h2>
+      <p class="help">Quién está parado en la etapa "Calificado" ahora mismo, en cada embudo, y a cuánto suma en pesos.</p>
+      <div id="crosstabTable"></div>
+      <div class="help" id="crosstabExcluidos" style="margin-top:10px;"></div>
+      <details><summary>JSON crudo</summary><pre id="rawJsonCrosstab"></pre></details>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const WEBHOOK_URL = "https://digital-crew-n8n.xrzfaj.easypanel.host/webhook/AI-AUDITORIA-COMERCIAL";
+
+const els = {
+  dateFrom: document.getElementById('dateFrom'),
+  dateTo: document.getElementById('dateTo'),
+  filterByToggle: document.getElementById('filterByToggle'),
+  pipelineChecks: document.getElementById('pipelineChecks'),
+  agentChecks: document.getElementById('agentChecks'),
+  btnGenerar: document.getElementById('btnGenerar'),
+  calificadosToggle: document.getElementById('calificadosToggle'),
+  status: document.getElementById('status'),
+  resultsRow: document.getElementById('resultsRow'),
+  resultsTable: document.getElementById('resultsTable'),
+  rawJson: document.getElementById('rawJson'),
+  crosstabTable: document.getElementById('crosstabTable'),
+  crosstabExcluidos: document.getElementById('crosstabExcluidos'),
+  rawJsonCrosstab: document.getElementById('rawJsonCrosstab'),
+};
+
+let filterBy = 'created_at';
+let calificadosMode = 'actual';
+
+els.calificadosToggle.addEventListener('click', (e) => {
+  const label = e.target.closest('label');
+  if (!label) return;
+  [...els.calificadosToggle.children].forEach(l => l.classList.remove('active'));
+  label.classList.add('active');
+  calificadosMode = label.dataset.value;
+});
+
+els.filterByToggle.addEventListener('click', (e) => {
+  const label = e.target.closest('label');
+  if (!label) return;
+  [...els.filterByToggle.children].forEach(l => l.classList.remove('active'));
+  label.classList.add('active');
+  filterBy = label.dataset.value;
+});
+
+function fmt(d) { return d.toISOString().slice(0, 10); }
+
+document.querySelectorAll('[data-preset]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const today = new Date();
+    let from, to;
+    if (btn.dataset.preset === 'hoy') { from = today; to = today; }
+    if (btn.dataset.preset === 'semana') {
+      const day = (today.getDay() + 6) % 7; // lunes = 0
+      from = new Date(today); from.setDate(today.getDate() - day);
+      to = today;
+    }
+    if (btn.dataset.preset === 'mes') {
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+      to = today;
+    }
+    if (btn.dataset.preset === 'mesPasado') {
+      from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      to = new Date(today.getFullYear(), today.getMonth(), 0);
+    }
+    els.dateFrom.value = fmt(from);
+    els.dateTo.value = fmt(to);
+  });
+});
+
+(function setDefaultDates() {
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1);
+  els.dateFrom.value = fmt(first);
+  els.dateTo.value = fmt(today);
+})();
+
+function setStatus(text, kind) { els.status.textContent = text; els.status.className = 'status ' + kind; }
+
+function extractPayload(data, requiredKey) {
+  const candidates = [data, Array.isArray(data) ? data[0] : null, Array.isArray(data) && data[0] ? data[0].json : null];
+  for (const c of candidates) { if (c && typeof c === 'object' && requiredKey in c) return c; }
+  throw new Error(`La respuesta no tiene la forma esperada (busqué "${requiredKey}"). Respuesta cruda:\n` + JSON.stringify(data, null, 2).slice(0, 1500));
+}
+
+async function callWebhook(body) {
+  const res = await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`El webhook respondió ${res.status}. Revisa que el workflow esté activo en n8n.`);
+  return res.json();
+}
+
+function pct(n, total) { return total ? Math.round((n / total) * 100) + '%' : '0%'; }
+
+// --- Carga inicial del catálogo (sin botón, sin URL visible) ---
+(async function cargarCatalogo() {
+  try {
+    const data = await callWebhook({ type: 'scan' });
+    const scanData = extractPayload(data, 'pipelines');
+    els.pipelineChecks.innerHTML = scanData.pipelines.map(p => `<label><input type="checkbox" value="${p.id}" class="pipelineCheck"> ${p.name}</label>`).join('');
+    els.agentChecks.innerHTML = scanData.agents.map(a => `<label><input type="checkbox" value="${a.id}" class="agentCheck"> ${a.name}</label>`).join('');
+    setStatus('Catálogo listo.', 'ok');
+  } catch (err) {
+    setStatus('No se pudo cargar el catálogo: ' + err.message, 'err');
+    console.error(err);
+  }
+})();
+
+// --- Un solo botón: dispara los dos reportes y muestra ambos ---
+els.btnGenerar.addEventListener('click', async () => {
+  if (!els.dateFrom.value || !els.dateTo.value) {
+    setStatus('Falta elegir el rango de fechas.', 'err');
+    return;
+  }
+  const pipelineIds = [...document.querySelectorAll('.pipelineCheck:checked')].map(c => Number(c.value));
+  const agentIds = [...document.querySelectorAll('.agentCheck:checked')].map(c => Number(c.value));
+  const useSnapshot = calificadosMode === 'actual';
+
+  els.btnGenerar.disabled = true;
+  setStatus('Generando reporte de desempeño y cross-tab de calificados…', 'pending');
+  els.resultsRow.style.display = 'none';
+
+  try {
+    const perfBody = {
+      type: 'leads', view: 'performance',
+      date_from: els.dateFrom.value, date_to: els.dateTo.value,
+      filter_by: filterBy,
+      pipeline_ids: pipelineIds, agent_ids: agentIds,
+    };
+    const crossBody = {
+      type: 'leads', view: 'qualified_crosstab',
+      pipeline_ids: pipelineIds, agent_ids: agentIds,
+    };
+    if (!useSnapshot) { crossBody.date_from = els.dateFrom.value; crossBody.date_to = els.dateTo.value; }
+
+    const [perfData, crossData] = await Promise.all([callWebhook(perfBody), callWebhook(crossBody)]);
+
+    const perfPayload = extractPayload(perfData, 'por_embudo');
+    renderResultados(perfPayload);
+    els.rawJson.textContent = JSON.stringify(perfData, null, 2);
+
+    const crossPayload = extractPayload(crossData, 'totales');
+    renderCrosstab(crossPayload);
+    els.rawJsonCrosstab.textContent = JSON.stringify(crossData, null, 2);
+
+    els.resultsRow.style.display = 'flex';
+    setStatus(`Listo. Desempeño: ${perfPayload.total_leads_extraidos} leads extraídos (filtrado por ${perfPayload.periodo.filtrado_por}). Calificados: ${crossPayload.totales.leads_calificados} en total.`, 'ok');
+  } catch (err) {
+    setStatus('No se pudo generar el reporte: ' + err.message, 'err');
+    console.error(err);
+  } finally {
+    els.btnGenerar.disabled = false;
+  }
+});
+
+function renderResultados(payload) {
+  const embudos = Object.values(payload.por_embudo || {});
+  if (!embudos.length) { els.resultsTable.innerHTML = '<div class="empty">Sin leads en este periodo con estos filtros.</div>'; return; }
+  const totales = embudos.reduce((acc, e) => {
+    acc.total += e.total; acc.efectivo += e.efectivo; acc.cotizacion += e.cotizacion;
+    acc.calificado += e.calificado; acc.ganado += e.ganado; acc.perdido += e.perdido; acc.monto_ganado += e.monto_ganado;
+    return acc;
+  }, { total: 0, efectivo: 0, cotizacion: 0, calificado: 0, ganado: 0, perdido: 0, monto_ganado: 0 });
+
+  const rows = embudos.map(e => {
+    const motivosOrdenados = Object.entries(e.motivos_perdida).sort((a, b) => b[1] - a[1]);
+    const motivosCompleto = motivosOrdenados.map(([m, c]) => `${m} (${c})`).join(', ') || 'Sin pérdidas';
+    const motivosCorto = motivosOrdenados.slice(0, 1).map(([m, c]) => `${m} (${c})`).join(', ')
+      + (motivosOrdenados.length > 1 ? ` +${motivosOrdenados.length - 1} más` : '') || '—';
+    return `
+    <tr>
+      <td>${e.embudo}</td>
+      <td class="num"><span class="numval">${e.total}</span></td>
+      <td class="num"><span class="numval">${e.efectivo}</span><span class="pct">${pct(e.efectivo, e.total)}</span></td>
+      <td class="num"><span class="numval">${e.cotizacion}</span><span class="pct">${pct(e.cotizacion, e.total)}</span></td>
+      <td class="num"><span class="numval">${e.calificado}</span><span class="pct">${pct(e.calificado, e.total)}</span></td>
+      <td class="num"><span class="numval">${e.ganado}</span></td>
+      <td class="num"><span class="numval">$${e.monto_ganado.toLocaleString('es-MX')}</span></td>
+      <td class="num"><span class="numval">${e.perdido}</span></td>
+      <td class="motivos" title="${motivosCompleto}">${motivosCorto}</td>
+    </tr>`;
+  }).join('');
+
+  els.resultsTable.innerHTML = `
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Embudo</th><th class="num">Total</th><th class="num">Efectivo</th><th class="num">Cotiz.</th><th class="num">Calif.</th><th class="num">Ganado</th><th class="num">Monto</th><th class="num">Perdido</th><th>Motivos</th></tr></thead>
+      <tbody>${rows}
+        <tr class="totales">
+          <td>Total</td><td class="num"><span class="numval">${totales.total}</span></td>
+          <td class="num"><span class="numval">${totales.efectivo}</span><span class="pct">${pct(totales.efectivo, totales.total)}</span></td>
+          <td class="num"><span class="numval">${totales.cotizacion}</span><span class="pct">${pct(totales.cotizacion, totales.total)}</span></td>
+          <td class="num"><span class="numval">${totales.calificado}</span><span class="pct">${pct(totales.calificado, totales.total)}</span></td>
+          <td class="num"><span class="numval">${totales.ganado}</span></td><td class="num"><span class="numval">$${totales.monto_ganado.toLocaleString('es-MX')}</span></td>
+          <td class="num"><span class="numval">${totales.perdido}</span></td><td></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>`;
+}
+
+function renderCrosstab(payload) {
+  const embudos = Object.values(payload.por_embudo || {});
+  if (!embudos.length) { els.crosstabTable.innerHTML = '<div class="empty">Sin resultados.</div>'; return; }
+  const rows = embudos.map(e => `<tr><td>${e.embudo}</td><td class="num">${e.leads_calificados}</td><td class="num">$${e.monto_calificado.toLocaleString('es-MX')}</td></tr>`).join('');
+  els.crosstabTable.innerHTML = `
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Embudo</th><th class="num">Leads calificados</th><th class="num">Monto</th></tr></thead>
+      <tbody>${rows}
+        <tr class="totales"><td>Total</td><td class="num">${payload.totales.leads_calificados}</td><td class="num">$${payload.totales.monto_calificado.toLocaleString('es-MX')}</td></tr>
+      </tbody>
+    </table>
+    </div>`;
+  const excluidos = payload.embudos_excluidos_sin_etapa_calificado || [];
+  els.crosstabExcluidos.textContent = excluidos.length ? `No incluidos (sin etapa "Calificado"): ${excluidos.join(', ')}` : '';
+}
+</script>
+</body>
+</html>
