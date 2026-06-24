@@ -202,6 +202,27 @@
       <div class="help" id="crosstabExcluidos" style="margin-top:10px;"></div>
       <details><summary>JSON crudo</summary><pre id="rawJsonCrosstab"></pre></details>
     </div>
+    <div class="panel">
+      <h2>Ganados del periodo</h2>
+      <p class="help">Proyectos cerrados (ganados) por embudo en el rango de fechas elegido, el monto total y el ticket promedio de venta.</p>
+      <div id="ganadosTable"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="callsPanel" style="display:none;">
+    <h2>Volumen de llamadas</h2>
+    <p class="help">Llamadas entrantes y salientes registradas en Kommo en el rango de fechas. No se filtra por embudo: las llamadas se adjuntan a contactos, no siempre a un lead de un pipeline específico.</p>
+
+    <h2 style="margin-top:18px;">Por responsable del lead/contacto</h2>
+    <p class="help">A quién pertenece el contacto o lead en el que quedó registrada la llamada (no necesariamente quién marcó).</p>
+    <div id="callsTableResponsable"></div>
+
+    <h2 style="margin-top:18px;">Por quién registró la llamada (Twilio)</h2>
+    <p class="help">Quién (o qué integración) generó el registro de la llamada. En esta cuenta suele coincidir con quién marcó o atendió físicamente vía Twilio.</p>
+    <div id="callsTableCreador"></div>
+
+    <div class="help" id="callsNota" style="margin-top:10px;"></div>
+    <details><summary>JSON crudo</summary><pre id="rawJsonCalls"></pre></details>
   </div>
 
 </div>
@@ -224,10 +245,17 @@ const els = {
   crosstabTable: document.getElementById('crosstabTable'),
   crosstabExcluidos: document.getElementById('crosstabExcluidos'),
   rawJsonCrosstab: document.getElementById('rawJsonCrosstab'),
+  ganadosTable: document.getElementById('ganadosTable'),
+  callsPanel: document.getElementById('callsPanel'),
+  callsTableResponsable: document.getElementById('callsTableResponsable'),
+  callsTableCreador: document.getElementById('callsTableCreador'),
+  callsNota: document.getElementById('callsNota'),
+  rawJsonCalls: document.getElementById('rawJsonCalls'),
 };
 
 let filterBy = 'created_at';
 let calificadosMode = 'actual';
+let agentsCatalog = []; // [{id, name}] — se llena al cargar el catálogo inicial
 
 els.calificadosToggle.addEventListener('click', (e) => {
   const label = e.target.closest('label');
@@ -298,6 +326,7 @@ function pct(n, total) { return total ? Math.round((n / total) * 100) + '%' : '0
   try {
     const data = await callWebhook({ type: 'scan' });
     const scanData = extractPayload(data, 'pipelines');
+    agentsCatalog = scanData.agents || [];
     els.pipelineChecks.innerHTML = scanData.pipelines.map(p => `<label><input type="checkbox" value="${p.id}" class="pipelineCheck"> ${p.name}</label>`).join('');
     els.agentChecks.innerHTML = scanData.agents.map(a => `<label><input type="checkbox" value="${a.id}" class="agentCheck"> ${a.name}</label>`).join('');
     setStatus('Catálogo listo.', 'ok');
@@ -333,19 +362,32 @@ els.btnGenerar.addEventListener('click', async () => {
       pipeline_ids: pipelineIds, agent_ids: agentIds,
     };
     if (!useSnapshot) { crossBody.date_from = els.dateFrom.value; crossBody.date_to = els.dateTo.value; }
+    const callsBody = {
+      type: 'calls',
+      date_from: els.dateFrom.value, date_to: els.dateTo.value,
+      agent_ids: agentIds,
+    };
 
-    const [perfData, crossData] = await Promise.all([callWebhook(perfBody), callWebhook(crossBody)]);
+    const [perfData, crossData, callsData] = await Promise.all([
+      callWebhook(perfBody), callWebhook(crossBody), callWebhook(callsBody)
+    ]);
 
     const perfPayload = extractPayload(perfData, 'por_embudo');
     renderResultados(perfPayload);
+    renderGanados(perfPayload);
     els.rawJson.textContent = JSON.stringify(perfData, null, 2);
 
     const crossPayload = extractPayload(crossData, 'totales');
     renderCrosstab(crossPayload);
     els.rawJsonCrosstab.textContent = JSON.stringify(crossData, null, 2);
 
+    const callsPayload = extractPayload(callsData, 'por_responsable');
+    renderLlamadas(callsPayload);
+    els.rawJsonCalls.textContent = JSON.stringify(callsData, null, 2);
+
     els.resultsRow.style.display = 'flex';
-    setStatus(`Listo. Desempeño: ${perfPayload.total_leads_extraidos} leads extraídos (filtrado por ${perfPayload.periodo.filtrado_por}). Calificados: ${crossPayload.totales.leads_calificados} en total.`, 'ok');
+    els.callsPanel.style.display = 'block';
+    setStatus(`Listo. Desempeño: ${perfPayload.total_leads_extraidos} leads extraídos (filtrado por ${perfPayload.periodo.filtrado_por}). Calificados: ${crossPayload.totales.leads_calificados} en total. Llamadas: ${callsPayload.total_llamadas}.`, 'ok');
   } catch (err) {
     setStatus('No se pudo generar el reporte: ' + err.message, 'err');
     console.error(err);
@@ -416,6 +458,92 @@ function renderCrosstab(payload) {
   const excluidos = payload.embudos_excluidos_sin_etapa_calificado || [];
   els.crosstabExcluidos.textContent = excluidos.length ? `No incluidos (sin etapa "Calificado"): ${excluidos.join(', ')}` : '';
 }
+
+function renderGanados(payload) {
+  const embudos = Object.values(payload.por_embudo || {}).filter(e => e.ganado > 0);
+  if (!embudos.length) { els.ganadosTable.innerHTML = '<div class="empty">Sin ganados en este periodo con estos filtros.</div>'; return; }
+  const totalProyectos = embudos.reduce((s, e) => s + e.ganado, 0);
+  const totalMonto = embudos.reduce((s, e) => s + e.monto_ganado, 0);
+  const rows = embudos.map(e => {
+    const ticket = e.ganado ? (e.monto_ganado / e.ganado) : 0;
+    return `
+    <tr>
+      <td>${e.embudo}</td>
+      <td class="num"><span class="numval">${e.ganado}</span></td>
+      <td class="num"><span class="numval">$${e.monto_ganado.toLocaleString('es-MX', {maximumFractionDigits:0})}</span></td>
+      <td class="num"><span class="numval">$${ticket.toLocaleString('es-MX', {maximumFractionDigits:0})}</span></td>
+    </tr>`;
+  }).join('');
+  const ticketTotal = totalProyectos ? (totalMonto / totalProyectos) : 0;
+  els.ganadosTable.innerHTML = `
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Embudo</th><th class="num">Proyectos</th><th class="num">Monto (MXN)</th><th class="num">Ticket promedio</th></tr></thead>
+      <tbody>${rows}
+        <tr class="totales">
+          <td>Total</td>
+          <td class="num"><span class="numval">${totalProyectos}</span></td>
+          <td class="num"><span class="numval">$${totalMonto.toLocaleString('es-MX', {maximumFractionDigits:0})}</span></td>
+          <td class="num"><span class="numval">$${ticketTotal.toLocaleString('es-MX', {maximumFractionDigits:0})}</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>`;
+}
+
+function nombreAgente(id) {
+  const found = agentsCatalog.find(a => String(a.id) === String(id));
+  return found ? found.name : `Usuario ${id}`;
+}
+
+function fmtDuracion(segundos) {
+  const h = Math.floor(segundos / 3600);
+  const m = Math.floor((segundos % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function tablaAgentes(agentes) {
+  if (!agentes.length) return '<div class="empty">Sin llamadas en este periodo.</div>';
+  agentes = [...agentes].sort((a, b) => b.total - a.total);
+  const totales = agentes.reduce((acc, a) => {
+    acc.salientes += a.salientes; acc.entrantes += a.entrantes; acc.total += a.total; acc.duracion_segundos += a.duracion_segundos;
+    return acc;
+  }, { salientes: 0, entrantes: 0, total: 0, duracion_segundos: 0 });
+  const rows = agentes.map(a => `
+    <tr>
+      <td>${nombreAgente(a.agent_id)}</td>
+      <td class="num">${a.salientes}</td>
+      <td class="num">${a.entrantes}</td>
+      <td class="num">${a.total}</td>
+      <td class="num">${fmtDuracion(a.duracion_segundos)}</td>
+    </tr>`).join('');
+  return `
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Asesor</th><th class="num">Salientes</th><th class="num">Entrantes</th><th class="num">Total</th><th class="num">Duración</th></tr></thead>
+      <tbody>${rows}
+        <tr class="totales">
+          <td>Total</td>
+          <td class="num">${totales.salientes}</td>
+          <td class="num">${totales.entrantes}</td>
+          <td class="num">${totales.total}</td>
+          <td class="num">${fmtDuracion(totales.duracion_segundos)}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>`;
+}
+
+function renderLlamadas(payloadResponsable) {
+  // extractPayload ya nos dio el objeto completo (tiene por_responsable Y por_creador)
+  const porResponsable = Object.values(payloadResponsable.por_responsable || {});
+  const porCreador = Object.values(payloadResponsable.por_creador || {});
+  els.callsTableResponsable.innerHTML = tablaAgentes(porResponsable);
+  els.callsTableCreador.innerHTML = tablaAgentes(porCreador);
+  els.callsNota.textContent = payloadResponsable.nota_metodologica || '';
+}
+
 </script>
 </body>
 </html>
