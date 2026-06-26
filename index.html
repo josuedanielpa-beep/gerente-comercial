@@ -210,17 +210,9 @@
   </div>
 
   <div class="panel" id="callsPanel" style="display:none;">
-    <h2>Volumen de llamadas</h2>
-    <p class="help">Llamadas entrantes y salientes registradas en Kommo en el rango de fechas. No se filtra por embudo: las llamadas se adjuntan a contactos, no siempre a un lead de un pipeline específico.</p>
-
-    <h2 style="margin-top:18px;">Por responsable del lead/contacto</h2>
-    <p class="help">A quién pertenece el contacto o lead en el que quedó registrada la llamada (no necesariamente quién marcó).</p>
-    <div id="callsTableResponsable"></div>
-
-    <h2 style="margin-top:18px;">Por quién registró la llamada (Twilio)</h2>
-    <p class="help">Quién (o qué integración) generó el registro de la llamada. En esta cuenta suele coincidir con quién marcó o atendió físicamente vía Twilio.</p>
+    <h2>Volumen de llamadas por asesor</h2>
+    <p class="help">Llamadas entrantes y salientes registradas en Kommo en el rango de fechas, agrupadas por quién realizó/registró la llamada vía Twilio.</p>
     <div id="callsTableCreador"></div>
-
     <div class="help" id="callsNota" style="margin-top:10px;"></div>
     <details><summary>JSON crudo</summary><pre id="rawJsonCalls"></pre></details>
   </div>
@@ -247,7 +239,6 @@ const els = {
   rawJsonCrosstab: document.getElementById('rawJsonCrosstab'),
   ganadosTable: document.getElementById('ganadosTable'),
   callsPanel: document.getElementById('callsPanel'),
-  callsTableResponsable: document.getElementById('callsTableResponsable'),
   callsTableCreador: document.getElementById('callsTableCreador'),
   callsNota: document.getElementById('callsNota'),
   rawJsonCalls: document.getElementById('rawJsonCalls'),
@@ -381,7 +372,7 @@ els.btnGenerar.addEventListener('click', async () => {
     renderCrosstab(crossPayload);
     els.rawJsonCrosstab.textContent = JSON.stringify(crossData, null, 2);
 
-    const callsPayload = extractPayload(callsData, 'por_responsable');
+    const callsPayload = extractPayload(callsData, 'por_creador');
     renderLlamadas(callsPayload);
     els.rawJsonCalls.textContent = JSON.stringify(callsData, null, 2);
 
@@ -535,13 +526,10 @@ function tablaAgentes(agentes) {
     </div>`;
 }
 
-function renderLlamadas(payloadResponsable) {
-  // extractPayload ya nos dio el objeto completo (tiene por_responsable Y por_creador)
-  const porResponsable = Object.values(payloadResponsable.por_responsable || {});
-  const porCreador = Object.values(payloadResponsable.por_creador || {});
-  els.callsTableResponsable.innerHTML = tablaAgentes(porResponsable);
-  els.callsTableCreador.innerHTML = tablaAgentes(porCreador);
-  els.callsNota.textContent = payloadResponsable.nota_metodologica || '';
+function renderLlamadas(payload) {
+  const agentes = Object.values(payload.por_creador || {});
+  els.callsTableCreador.innerHTML = tablaAgentes(agentes);
+  els.callsNota.textContent = payload.nota_metodologica || '';
 }
 
 </script>
